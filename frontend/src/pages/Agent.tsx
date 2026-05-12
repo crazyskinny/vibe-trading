@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { useAgentStore } from "@/stores/agent";
 import { useSSE } from "@/hooks/useSSE";
 import { useI18n } from "@/lib/i18n";
+import { shouldSubmitPromptOnKeyDown } from "@/lib/chatInput";
 import { api } from "@/lib/api";
 import type { AgentMessage, ToolCallEntry } from "@/types/agent";
 import { AgentAvatar } from "@/components/chat/AgentAvatar";
@@ -816,7 +817,7 @@ export function Agent() {
                 el.style.height = el.scrollHeight + "px";
               }}
               onKeyDown={(e) => {
-                if (e.key === "Enter" && !e.shiftKey) {
+                if (shouldSubmitPromptOnKeyDown(e)) {
                   e.preventDefault();
                   runPrompt(input.trim());
                 }
