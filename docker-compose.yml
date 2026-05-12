@@ -10,6 +10,7 @@ services:
     volumes:
       - vibe-runs:/app/agent/runs
       - vibe-sessions:/app/agent/sessions
+      - vibe-home:/home/vibe
     restart: unless-stopped
 
   frontend:
@@ -31,3 +32,4 @@ services:
 volumes:
   vibe-runs:
   vibe-sessions:
+  vibe-home:
