@@ -154,33 +154,35 @@ export function Layout() {
                         )}
                         title={s.title || s.session_id}
                       >
-                        <span className="flex items-center gap-1.5">
+                        <span className="flex min-w-0 items-center gap-1.5">
                           <span className={cn(
                             "h-1.5 w-1.5 rounded-full shrink-0",
                             s.status === "failed" ? "bg-danger" : isActive ? "bg-warning" : "bg-success/60"
                           )} />
-                          {s.title || s.session_id.slice(0, 16)}
+                          <span className="min-w-0 flex-1 truncate">{s.title || s.session_id.slice(0, 16)}</span>
                         </span>
                       </Link>
                     )}
                     {!isRenaming && isDeleting ? (
-                      <div className="absolute right-0.5 flex items-center gap-0.5">
+                      <div className="absolute right-0.5 flex shrink-0 items-center gap-0.5 rounded-md bg-card/95">
                         <button onClick={() => deleteSession(s.session_id)} className="p-1 text-danger hover:bg-danger/10 rounded text-[10px] font-medium">{t.confirmDelete}</button>
                         <button onClick={() => setDeleteTarget(null)} className="p-1 text-muted-foreground hover:bg-muted rounded text-[10px]">{t.cancelDelete}</button>
                       </div>
                     ) : !isRenaming ? (
-                      <div className="absolute right-1 opacity-0 group-hover:opacity-100 flex items-center gap-0.5 transition-opacity">
+                      <div className="absolute right-1 flex shrink-0 items-center gap-0.5 rounded-md bg-card/95 opacity-0 transition-opacity group-hover:opacity-100">
                         <button
                           onClick={(e) => { e.preventDefault(); e.stopPropagation(); setRenameTarget(s.session_id); setRenameValue(s.title || ""); }}
-                          className="p-1 text-muted-foreground hover:text-foreground rounded"
+                          className="pointer-events-auto p-1 text-muted-foreground hover:text-foreground rounded"
                           title="Rename"
+                          aria-label="Rename session"
                         >
                           <Pencil className="h-3 w-3" />
                         </button>
                         <button
                           onClick={(e) => { e.preventDefault(); e.stopPropagation(); setDeleteTarget(s.session_id); }}
-                          className="p-1 text-muted-foreground hover:text-danger rounded"
+                          className="pointer-events-auto p-1 text-muted-foreground hover:text-danger rounded"
                           title={t.deleteConfirm}
+                          aria-label="Delete session"
                         >
                           <Trash2 className="h-3 w-3" />
                         </button>

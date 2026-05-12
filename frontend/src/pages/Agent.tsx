@@ -11,6 +11,7 @@ import type { AgentMessage, ToolCallEntry } from "@/types/agent";
 import { AgentAvatar } from "@/components/chat/AgentAvatar";
 import { WelcomeScreen } from "@/components/chat/WelcomeScreen";
 import { MessageBubble } from "@/components/chat/MessageBubble";
+import { MarkdownContent } from "@/components/chat/MarkdownContent";
 import { ThinkingTimeline } from "@/components/chat/ThinkingTimeline";
 import { ConversationTimeline } from "@/components/chat/ConversationTimeline";
 import { SwarmDashboard, type SwarmAgent, type SwarmDashboardProps } from "@/components/chat/SwarmDashboard";
@@ -48,6 +49,7 @@ export function Agent() {
   const prevSseStatusRef = useRef<string>("disconnected");
   const genRef = useRef(0);
   const [showScrollBtn, setShowScrollBtn] = useState(false);
+  const [pendingHistoryScroll, setPendingHistoryScroll] = useState(false);
   const lastEventRef = useRef(0);
 
   const [attachment, setAttachment] = useState<{ filename: string; filePath: string } | null>(null);
@@ -87,16 +89,20 @@ export function Agent() {
     }
     cancelAnimationFrame(rafRef.current);
     rafRef.current = requestAnimationFrame(() => {
-      if (listRef.current) listRef.current.scrollTop = listRef.current.scrollHeight;
+      const el = listRef.current;
+      if (el) el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
     });
   }, [isNearBottom]);
 
-  const forceScrollToBottom = useCallback(() => {
+  const scrollToBottomInstant = useCallback(() => {
     setShowScrollBtn(false);
-    requestAnimationFrame(() => {
-      if (listRef.current) listRef.current.scrollTop = listRef.current.scrollHeight;
-    });
+    const el = listRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
   }, []);
+
+  const forceScrollToBottom = useCallback(() => {
+    requestAnimationFrame(scrollToBottomInstant);
+  }, [scrollToBottomInstant]);
 
   /* Track scroll position to show/hide scroll button */
   useEffect(() => {
@@ -149,11 +155,11 @@ export function Agent() {
       act().loadHistory(agentMsgs);
       act().setSessionLoading(false);
       act().cacheSession(sid, agentMsgs);
-      setTimeout(() => forceScrollToBottom(), 50);
+      setPendingHistoryScroll(true);
     } catch {
       act().setSessionLoading(false);
     }
-  }, [forceScrollToBottom]);
+  }, []);
 
   const setupSSE = useCallback((sid: string) => {
     if (sseSessionRef.current === sid) return;
@@ -271,7 +277,7 @@ export function Agent() {
       const cached = getCachedSession(urlSessionId);
       switchSession(urlSessionId, cached);
       if (cached) {
-        setTimeout(() => forceScrollToBottom(), 50);
+        setPendingHistoryScroll(true);
       } else {
         loadSessionMessages(urlSessionId, gen);
       }
@@ -281,7 +287,24 @@ export function Agent() {
       if (curMsgs.length > 0) cacheSession(curSid, curMsgs);
       reset();
     }
-  }, [urlSessionId, doDisconnect, loadSessionMessages, setupSSE, forceScrollToBottom]);
+  }, [urlSessionId, doDisconnect, loadSessionMessages, setupSSE]);
+
+  useEffect(() => {
+    if (!pendingHistoryScroll || sessionLoading) return;
+    let frame = 0;
+    let attempts = 0;
+    const settleAndScroll = () => {
+      scrollToBottomInstant();
+      attempts += 1;
+      if (attempts < 3) {
+        frame = requestAnimationFrame(settleAndScroll);
+        return;
+      }
+      setPendingHistoryScroll(false);
+    };
+    frame = requestAnimationFrame(settleAndScroll);
+    return () => cancelAnimationFrame(frame);
+  }, [messages.length, pendingHistoryScroll, scrollToBottomInstant, sessionLoading]);
 
   useEffect(() => () => doDisconnect(), [doDisconnect]);
 
@@ -693,8 +716,8 @@ export function Agent() {
               <AgentAvatar />
               <div className="flex-1 min-w-0 space-y-1.5">
                 {streamingText && (
-                  <div className="prose prose-sm dark:prose-invert max-w-none leading-relaxed">
-                    {streamingText}
+                  <div className="relative">
+                    <MarkdownContent>{streamingText}</MarkdownContent>
                     <span className="inline-block w-0.5 h-4 bg-primary ml-0.5 animate-pulse align-middle" />
                   </div>
                 )}
@@ -732,11 +755,17 @@ export function Agent() {
         <div className="max-w-3xl mx-auto space-y-2">
           {/* Swarm preset badge */}
           {swarmPreset && (
-            <div className="flex items-center gap-1">
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-violet-500/10 text-violet-600 dark:text-violet-400 text-xs font-medium">
-                <Users className="h-3 w-3" />
-                {swarmPreset.title}
-                <button type="button" onClick={() => setSwarmPreset(null)} className="hover:text-destructive transition-colors">
+            <div className="flex min-w-0 items-center gap-1">
+              <span className="inline-flex max-w-full min-w-0 items-center gap-1.5 rounded-lg bg-violet-500/10 px-2.5 py-1 text-xs font-medium text-violet-600 dark:text-violet-400">
+                <Users className="h-3 w-3 shrink-0" />
+                <span className="truncate">{swarmPreset.title}</span>
+                <button
+                  type="button"
+                  onClick={() => setSwarmPreset(null)}
+                  className="shrink-0 rounded-sm hover:text-destructive transition-colors"
+                  aria-label="Clear swarm mode"
+                  title="Clear swarm mode"
+                >
                   <X className="h-3 w-3" />
                 </button>
               </span>
@@ -744,11 +773,17 @@ export function Agent() {
           )}
           {/* Attachment badge */}
           {attachment && (
-            <div className="flex items-center gap-1">
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-primary/10 text-primary text-xs font-medium">
-                <Paperclip className="h-3 w-3" />
-                {attachment.filename}
-                <button type="button" onClick={() => setAttachment(null)} className="hover:text-destructive transition-colors">
+            <div className="flex min-w-0 items-center gap-1">
+              <span className="inline-flex max-w-full min-w-0 items-center gap-1.5 rounded-lg bg-primary/10 px-2.5 py-1 text-xs font-medium text-primary">
+                <Paperclip className="h-3 w-3 shrink-0" />
+                <span className="truncate">{attachment.filename}</span>
+                <button
+                  type="button"
+                  onClick={() => setAttachment(null)}
+                  className="shrink-0 rounded-sm hover:text-destructive transition-colors"
+                  aria-label="Remove attachment"
+                  title="Remove attachment"
+                >
                   <X className="h-3 w-3" />
                 </button>
               </span>
